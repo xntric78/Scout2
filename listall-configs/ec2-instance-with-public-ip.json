@@ -9,5 +9,9 @@
     "conditions": [
         [ "PublicIpAddress", "notNull", "" ],
         [ "PublicIpAddress", "notEmpty", "" ]
-    ]
+    ],
+    "mapping": {
+        "_IP_PREFIX_": "PublicIpAddress",
+        "_REGION_": "ec2.regions"
+    }
 }

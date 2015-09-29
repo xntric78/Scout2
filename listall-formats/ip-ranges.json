@@ -1,0 +1,6 @@
+{
+    "header": "{\"createDate\": \"_CREATE_DATE_\", \"prefixes\": [",
+    "item": "{\"ip_prefix\": \"_IP_PREFIX_\", \"region\": \"_REGION_\"}",
+    "delimiter": ",",
+    "footer": "]}"
+}

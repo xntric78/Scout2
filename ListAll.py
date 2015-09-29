@@ -180,7 +180,7 @@ def get_values_at(dictionary, dic, path):
 #
 # Meat and potato is here...
 #
-def list_all(all_info, info, path, current_path, keys, conditions):
+def list_all(all_info, info, path, current_path, keys, conditions, output_format, mapping):
     key = path.pop(0)
     if key in info:
         current_path.append(key)
@@ -196,6 +196,15 @@ def list_all(all_info, info, path, current_path, keys, conditions):
                 else:
                     raise Exception
                 if condition_passed:
+                  if output_format != 'csv':
+                        output = output_format['item']
+                        for k in mapping:
+                            # TODO: Make this code shared with CSV and here...
+                            key_value = macro_get_key_at(all_info, info, current_path, key, value, mapping[k])
+                            key_value = key_value[0] if (type(key_value) == list and len(key_value) == 1) else key_value
+                            output = output.replace(k, key_value)
+                        output = output + output_format['delimiter']
+                  else:
                     # TODO: allow for other formatting than CSV and clean that code
                     output = ''
                     for k in keys:
@@ -205,12 +214,12 @@ def list_all(all_info, info, path, current_path, keys, conditions):
                             output = output + ', ' + str(key_value)
                         else:
                             output = str(key_value)
-                    printInfo(output)
+                  printInfo(output)
             else:
                 # keep track of where we are...
                 tmp = copy.deepcopy(current_path)
                 tmp.append(value)
-                list_all(all_info, info[key][value], copy.deepcopy(path), tmp, keys, conditions)
+                list_all(all_info, info[key][value], copy.deepcopy(path), tmp, keys, conditions, output_format, mapping)
 
 
 ########################################
@@ -225,6 +234,9 @@ def main(cmd_args):
     # Get the environment name
     environment_names = get_environment_name(cmd_args)
 
+    # Load output format
+    output_format = cmd_args.format[0] if cmd_args.format[0] == 'csv' else load_data(cmd_args.format[0], local_file = True)
+
     # Support multiple environments
     for environment_name in environment_names:
 
@@ -238,8 +250,9 @@ def main(cmd_args):
         else:
             args = cmd_args
 
-        # Conditions are optional
+        # Conditions and mapping are optional
         conditions = args.conditions if hasattr(args, 'conditions') else None
+        mapping = args.mapping if hasattr(args, 'mapping') else []
 
         # Load the data
         aws_config = {}
@@ -253,7 +266,11 @@ def main(cmd_args):
         for entity in args.entities:
             entity = entity.split('.')
             service = entity.pop(0)
-            list_all(aws_config, aws_config[service], entity, [ service ], args.keys, conditions)
+            if output_format != 'csv':
+                printInfo(output_format['header'])
+            list_all(aws_config, aws_config[service], entity, [ service ], args.keys, conditions, output_format, mapping)
+            if output_format != 'csv':
+                printInfo(output_format['footer'])
 
 
 ########################################
@@ -269,6 +286,11 @@ parser.add_argument('--config',
                     default=[],
                     nargs='+',
                     help='Config file that sets the entities and keys to be listed.')
+parser.add_argument('--format',
+                    dest='format',
+                    default=['csv'],
+                    nargs='+',
+                    help='Bleh.')
 parser.add_argument('--entities',
                     dest='entities',
                     default=[],
