@@ -3,9 +3,11 @@
         "ec2.regions.vpcs.instances"
     ],
     "keys": [
+        "this",
         "PublicIpAddress"
     ],
     "conditions": [
-        [ "PublicIpAddress", "notNull", "" ]
+        [ "PublicIpAddress", "notNull", "" ],
+        [ "PublicIpAddress", "notEmpty", "" ]
     ]
 }

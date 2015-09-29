@@ -1,0 +1,14 @@
+{
+    "entities": [
+        "ec2.regions.vpcs.security_groups.rules.protocols.ports.cidrs"
+    ],
+    "keys": [
+        "ec2.regions.vpcs.security_groups",
+        "ec2.regions.vpcs.security_groups.rules.protocols",
+        "ec2.regions.vpcs.security_groups.rules.protocols.ports",
+        "this"
+    ],
+    "conditions": [
+        [ "this", "notInSubnets", "_LIST_FROM_FILE_(ip-ranges-_PROFILE_.json, prefixes, ip_prefix)" ]
+    ]
+}

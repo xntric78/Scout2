@@ -6,9 +6,11 @@ from AWSScout2.utils import *
 # Import third-party packages
 import datetime
 import dateutil.parser
+import netaddr
 import re
 import sys
 
+re_list_from_file = re.compile(r'_LIST_FROM_FILE_\((.*?),\s+(.*?),\s+(.*?)\)')
 
 ########################################
 ##### Config file
@@ -21,12 +23,28 @@ class Bunch(object):
 #
 # Read arguments from a config file
 #
-def read_dump_config(config_file):
+def read_dump_config(config_file, environment_name):
     config = None
     try:
         with open(config_file, 'rt') as f:
             config = json.load(f)
+        # Load lists from files
+        for c1 in config['conditions']:
+            values = re_list_from_file.match(c1[2])
+            if values:
+                filename = values.groups()[0]
+                filename = filename.replace('_PROFILE_', environment_name)
+                key1 = values.groups()[1]
+                key2 = values.groups()[2]
+                data = load_data(filename, key1, True)
+                if key2 != '':
+                    targets = []
+                    for d in data:
+                        targets.append(d[key2])
+                    data = targets
+                c1[2] = data
     except Exception as e:
+        printException(e)
         printError('Error: failed to read the configuration from %s' % config_file)
     return config
 
@@ -47,24 +65,31 @@ def pass_conditions(conditions, all_info, current_path, current_value):
         for p in current_path:
             target_obj = target_obj[p]
         target_obj = get_values_at(target_obj, {}, key.split('.'))
-        if type(target_obj) == list:
-            one_match = False
-            for v in target_obj:
-                if pass_condition(test, value, v):
-                    one_match = True
-            if not one_match:
-                return False
-        else:
-            res = pass_condition(test, value, target_obj)
-            if not res:
-                return False
+#        if type(target_obj) == list:
+#            one_match = False
+#            for v in target_obj:
+#                if pass_condition(test, value, v):
+#                    one_match = True
+#            if not one_match:
+#                return False
+#        else:
+        res = pass_condition(test, value, target_obj)
+        if not res:
+            return False
     return True
 
 #
 # Generic tests
 #
 def pass_condition(test, a, b):
-    if test == 'containAtleastOneOf':
+    if test == 'notInSubnets':
+        grant = netaddr.IPNetwork(b[0])
+        for c in a:
+            known_subnet = netaddr.IPNetwork(c)
+            if grant in known_subnet:
+                return False
+        return True
+    elif test == 'containAtLeastOneOf':
         if not type(b) == list:
             b = [ b ]
         for c in b:
@@ -76,9 +101,9 @@ def pass_condition(test, a, b):
     elif test == 'notEqual':
         return a != b
     elif test == 'empty':
-        return ((type(b) == dict and b == {}) or (type(b) == list and b == []))
+        return ((type(b) == dict and b == {}) or (type(b) == list and b == []) or (type(b) == list and b == [None]))
     elif test == 'notEmpty':
-        return not ((type(b) == dict and b == {}) or (type(b) == list and b == []))
+        return not ((type(b) == dict and b == {}) or (type(b) == list and b == []) or(type(b) == list and b == [None]))
     elif test == 'match':
         return re.match(a, b) != None
     elif test == 'notMatch':
@@ -94,6 +119,8 @@ def pass_condition(test, a, b):
         except Exception as e:
             # Failure means an invalid date, meaning no activity
             return True
+    else:
+        print 'Error: unknown test case %s' % test
     return False
 
 
@@ -129,7 +156,7 @@ def get_values_at(dictionary, dic, path):
     if not dic:
         dic = dictionary
     if path == ['this']:
-        return dic    
+        return dic
     for p in path:
         if p == '*':
             for k in dic:
@@ -198,21 +225,21 @@ def main(cmd_args):
     # Get the environment name
     environment_names = get_environment_name(cmd_args)
 
-    # Load arguments from config if specified
-    if len(cmd_args.config):
-        config = read_dump_config(cmd_args.config[0])
-        if config:
-            args = Bunch(config)
-        else:
-            return 42
-    else:
-        args = cmd_args
-
-    # Conditions are optional
-    conditions = args.conditions if hasattr(args, 'conditions') else None
-
     # Support multiple environments
     for environment_name in environment_names:
+
+        # Load arguments from config if specified
+        if len(cmd_args.config):
+            config = read_dump_config(cmd_args.config[0], environment_name)
+            if config:
+                args = Bunch(config)
+            else:
+                return 42
+        else:
+            args = cmd_args
+
+        # Conditions are optional
+        conditions = args.conditions if hasattr(args, 'conditions') else None
 
         # Load the data
         aws_config = {}
